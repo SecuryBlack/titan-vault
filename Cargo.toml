@@ -6,8 +6,12 @@ license = "Apache-2.0"
 description = "SecuryBlack storage, backup and disaster recovery agent"
 repository = "https://github.com/securyblack/titan-vault"
 
+[[bin]]
+name = "titanvault"
+path = "src/main.rs"
+
 [dependencies]
-sb-agent-core = { path = "../sb-agent-core" }
+sb-agent-core = { git = "https://github.com/securyblack/sb-agent-core", branch = "main" }
 tokio = { version = "1", features = ["full"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

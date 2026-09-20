@@ -2387,6 +2387,7 @@ dependencies = [
 [[package]]
 name = "sb-agent-core"
 version = "0.1.0"
+source = "git+https://github.com/securyblack/sb-agent-core?branch=main#0e23c815ce70644f8839d5a4f80d511486711096"
 dependencies = [
  "crossterm",
  "rand 0.8.8",
