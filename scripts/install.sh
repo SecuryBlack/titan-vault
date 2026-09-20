@@ -35,9 +35,10 @@ sb_info "Installing TitanVault version: ${VERSION}"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
-ASSET_URL="https://github.com/${REPO}/releases/download/${VERSION}/${BIN_NAME}-${TARGET}.tar.gz"
-sb_download_and_verify "$ASSET_URL" "$TMP_DIR/asset.tar.gz"
-sb_install_binary "$TMP_DIR/asset.tar.gz" "$BIN_NAME" "/usr/local/bin"
+ASSET_NAME="${BIN_NAME}-${TARGET}.tar.gz"
+ASSET_URL="https://github.com/${REPO}/releases/download/${VERSION}/${ASSET_NAME}"
+sb_download_and_verify "$ASSET_URL" "$TMP_DIR/${ASSET_NAME}"
+sb_install_binary "$TMP_DIR/${ASSET_NAME}" "$BIN_NAME" "/usr/local/bin"
 
 # Escribir configuración inicial si no existe
 CONFIG_DIR="/etc/titanvault"
