@@ -1,0 +1,33 @@
+version = "0.1.0"
+agent_name = "titanvault"
+mode = "standalone"
+
+[schedule]
+enabled = true
+cron = "0 2 * * *"
+hourly_cron = "0 * * * *"
+
+[retention]
+keep_hourly = 24
+keep_daily = 7
+keep_weekly = 4
+keep_monthly = 12
+keep_yearly = 3
+
+[crypto]
+enabled = true
+algorithm = "chacha20-poly1305"
+passphrase = "test-securyblack-vault-key"
+
+[sources]
+databases = []
+
+[[sources.filesystems]]
+name = "test-scripts"
+enabled = true
+paths = ["d:/titan-vault/scripts"]
+excludes = []
+
+[targets.local]
+enabled = true
+path = "d:/titan-vault/temp_store"
