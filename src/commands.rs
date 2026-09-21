@@ -58,18 +58,40 @@ pub fn build_command_registry(
         registry.register("list_snapshots", move |payload, _progress_tx| {
             let p = p.clone();
             async move {
-                let target_id = payload
+                let target_param = payload
                     .get("target")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("hetzner");
+                    .and_then(|v| v.as_str());
 
-                match p.storage().list_snapshots(target_id).await {
-                    Ok(snapshots) => {
-                        let json = serde_json::to_string_pretty(&snapshots).unwrap_or_default();
-                        CommandOutcome::ok(json)
-                    }
-                    Err(e) => CommandOutcome::failed(format!("Failed to list snapshots: {:#}", e)),
+                let storage = p.storage();
+                let available_targets = storage.get_targets();
+
+                if available_targets.is_empty() {
+                    return CommandOutcome::ok("[]".to_string());
                 }
+
+                let mut all_snapshots = Vec::new();
+
+                if let Some(target_id) = target_param {
+                    if target_id != "all" && storage.get_target(target_id).is_some() {
+                        match storage.list_snapshots(target_id).await {
+                            Ok(snapshots) => {
+                                let json = serde_json::to_string_pretty(&snapshots).unwrap_or_default();
+                                return CommandOutcome::ok(json);
+                            }
+                            Err(e) => return CommandOutcome::failed(format!("Failed to list snapshots on {}: {:#}", target_id, e)),
+                        }
+                    }
+                }
+
+                // If target not specified, "all", or specified target not configured, query all active targets
+                for target in available_targets {
+                    if let Ok(snapshots) = storage.list_snapshots(&target.id).await {
+                        all_snapshots.extend(snapshots);
+                    }
+                }
+                all_snapshots.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+                let json = serde_json::to_string_pretty(&all_snapshots).unwrap_or_default();
+                CommandOutcome::ok(json)
             }
         });
     }
