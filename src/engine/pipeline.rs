@@ -60,6 +60,37 @@ impl BackupPipeline {
         self.storage.clone()
     }
 
+    pub fn config(&self) -> &Config {
+        &self.config
+    }
+
+    /// Ejecuta el pipeline para un único origen específico por su nombre
+    pub async fn run_source(&self, source_name: &str, level: &str) -> Vec<BackupReport> {
+        let mut reports = Vec::new();
+
+        for db in &self.config.sources.databases {
+            if db.name == source_name {
+                match self.run_database_backup(db, level).await {
+                    Ok(report) => reports.push(report),
+                    Err(e) => error!("Database backup failed for '{}': {:#}", db.name, e),
+                }
+                return reports;
+            }
+        }
+
+        for fs in &self.config.sources.filesystems {
+            if fs.name == source_name {
+                match self.run_filesystem_backup(fs, level).await {
+                    Ok(report) => reports.push(report),
+                    Err(e) => error!("Filesystem backup failed for '{}': {:#}", fs.name, e),
+                }
+                return reports;
+            }
+        }
+
+        reports
+    }
+
     /// Ejecuta el pipeline completo de backup para todos los orígenes activos
     pub async fn run_all(&self, level: &str) -> Vec<BackupReport> {
         let mut reports = Vec::new();

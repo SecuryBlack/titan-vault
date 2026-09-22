@@ -1,12 +1,14 @@
 mod commands;
 mod config;
 mod engine;
+mod state;
 mod storage;
 mod tui;
 
 use config::{Config, AGENT_NAME, BIN_NAME, VERSION};
 use engine::pipeline::BackupPipeline;
 use engine::scheduler::AutonomousScheduler;
+use state::SharedVaultState;
 use std::sync::Arc;
 use tokio::sync::watch;
 use tracing::info;
@@ -20,7 +22,8 @@ async fn run(shutdown: tokio::sync::oneshot::Receiver<()>) {
         }
     };
 
-    let log_dir = sb_agent_core::config::default_config_path(AGENT_NAME)
+    let config_path = sb_agent_core::config::default_config_path(AGENT_NAME);
+    let log_dir = config_path
         .parent()
         .expect("config path always has a parent")
         .to_path_buf();
@@ -47,8 +50,16 @@ async fn run(shutdown: tokio::sync::oneshot::Receiver<()>) {
         }
     };
 
-    // 3. Command Intake Socket (para recibir órdenes de nexus-agent / SecuryBlack Cloud)
-    let command_registry = commands::build_command_registry(cfg.clone(), pipeline.clone());
+    // 3. Estado Compartido Reactivo
+    let shared_state = Arc::new(SharedVaultState::new(
+        cfg.clone(),
+        pipeline.clone(),
+        config_path,
+        Some(status_handle.clone()),
+    ));
+
+    // 4. Command Intake Socket (para recibir órdenes de nexus-agent / SecuryBlack Cloud)
+    let command_registry = commands::build_command_registry(shared_state.clone());
     commands::start_command_intake_server(AGENT_NAME, command_registry);
 
     status_handle.set_state("running");
@@ -60,8 +71,8 @@ async fn run(shutdown: tokio::sync::oneshot::Receiver<()>) {
         "schedule_enabled": cfg.schedule.enabled,
     }));
 
-    // 4. Scheduler Autónomo
-    let scheduler = AutonomousScheduler::new(cfg, pipeline);
+    // 5. Scheduler Autónomo
+    let scheduler = AutonomousScheduler::new(shared_state);
     let (shutdown_tx, shutdown_rx) = watch::channel(false);
 
     let sched_handle = tokio::spawn(async move {
