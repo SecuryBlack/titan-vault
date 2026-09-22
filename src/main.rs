@@ -71,7 +71,15 @@ async fn run(shutdown: tokio::sync::oneshot::Receiver<()>) {
         "schedule_enabled": cfg.schedule.enabled,
     }));
 
-    // 5. Scheduler Autónomo
+    // 5. Comprobador de actualizaciones en segundo plano (GitHub Releases)
+    sb_agent_core::updater::start_daily_check(sb_agent_core::updater::UpdaterConfig::new(
+        "securyblack",
+        "titan-vault",
+        "titanvault",
+        VERSION,
+    ));
+
+    // 6. Scheduler Autónomo
     let scheduler = AutonomousScheduler::new(shared_state);
     let (shutdown_tx, shutdown_rx) = watch::channel(false);
 

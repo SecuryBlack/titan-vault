@@ -383,6 +383,42 @@ pub fn build_command_registry(state: Arc<SharedVaultState>) -> CommandRegistry {
         });
     }
 
+    // 9. Comando: update_now (Actualización bajo demanda del binario desde GitHub Releases)
+    {
+        registry.register("update_now", move |_payload, _progress_tx| {
+            async move {
+                let cfg = sb_agent_core::updater::UpdaterConfig::new(
+                    "securyblack",
+                    "titan-vault",
+                    "titanvault",
+                    env!("CARGO_PKG_VERSION"),
+                );
+
+                let result =
+                    tokio::task::spawn_blocking(move || sb_agent_core::updater::check_now(&cfg)).await;
+
+                match result {
+                    Ok(Ok(true)) => {
+                        std::thread::spawn(|| {
+                            std::thread::sleep(std::time::Duration::from_secs(2));
+                            std::process::exit(0);
+                        });
+                        CommandOutcome::ok(
+                            serde_json::json!({ "updated": true, "previous_version": env!("CARGO_PKG_VERSION") })
+                                .to_string(),
+                        )
+                    }
+                    Ok(Ok(false)) => CommandOutcome::ok(
+                        serde_json::json!({ "updated": false, "current_version": env!("CARGO_PKG_VERSION") })
+                            .to_string(),
+                    ),
+                    Ok(Err(e)) => CommandOutcome::failed(format!("update check failed: {e}")),
+                    Err(e) => CommandOutcome::failed(format!("update task panicked: {e}")),
+                }
+            }
+        });
+    }
+
     registry
 }
 
