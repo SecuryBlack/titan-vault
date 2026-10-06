@@ -28,6 +28,16 @@ pub struct StorageManager {
 
 impl StorageManager {
     pub fn new(config: &Config) -> Result<Self> {
+        if config
+            .targets
+            .google_drive
+            .as_ref()
+            .is_some_and(|target| target.enabled)
+        {
+            return Err(anyhow!(
+                "native Google Drive storage is not implemented; use the parallel rclone adapter"
+            ));
+        }
         let mut targets = HashMap::new();
 
         // 1. Hetzner Object Storage (S3-compatible)
@@ -84,8 +94,8 @@ impl StorageManager {
                 let mut builder = services::Fs::default();
                 let root_str = local.path.to_string_lossy().to_string();
                 builder = builder.root(&root_str);
-                let op = Operator::new(builder)
-                    .context("failed to build local fs storage operator")?;
+                let op =
+                    Operator::new(builder).context("failed to build local fs storage operator")?;
 
                 targets.insert(
                     "local".to_string(),
@@ -111,8 +121,10 @@ impl StorageManager {
             .access_key_id(&s3.access_key)
             .secret_access_key(&s3.secret_key);
 
-        let op = Operator::new(builder)
-            .context(format!("failed to build S3 operator for bucket {}", s3.bucket))?;
+        let op = Operator::new(builder).context(format!(
+            "failed to build S3 operator for bucket {}",
+            s3.bucket
+        ))?;
 
         Ok(op)
     }
@@ -135,7 +147,10 @@ impl StorageManager {
         let check_path = if target.prefix.is_empty() {
             ".titanvault_healthcheck".to_string()
         } else {
-            format!("{}/.titanvault_healthcheck", target.prefix.trim_end_matches('/'))
+            format!(
+                "{}/.titanvault_healthcheck",
+                target.prefix.trim_end_matches('/')
+            )
         };
 
         let dummy_payload = format!("healthcheck:{}", chrono::Utc::now());
@@ -150,14 +165,22 @@ impl StorageManager {
     }
 
     /// Sube datos a todos los destinos configurados en paralelo
-    pub async fn upload_all(&self, rel_path: &str, data: Arc<Vec<u8>>) -> HashMap<String, Result<()>> {
+    pub async fn upload_all(
+        &self,
+        rel_path: &str,
+        data: Arc<Vec<u8>>,
+    ) -> HashMap<String, Result<()>> {
         let mut results = HashMap::new();
 
         for (id, target) in &self.targets {
             let full_path = if target.prefix.is_empty() {
                 rel_path.to_string()
             } else {
-                format!("{}/{}", target.prefix.trim_end_matches('/'), rel_path.trim_start_matches('/'))
+                format!(
+                    "{}/{}",
+                    target.prefix.trim_end_matches('/'),
+                    rel_path.trim_start_matches('/')
+                )
             };
 
             let op = target.operator.clone();
@@ -188,7 +211,7 @@ impl StorageManager {
             format!("{}/", target.prefix.trim_matches('/'))
         };
 
-        let mut lister = target.operator.lister_with(&prefix).await?;
+        let mut lister = target.operator.lister_with(&prefix).recursive(true).await?;
         let mut snapshots = Vec::new();
 
         while let Some(entry) = lister.next().await {
@@ -196,7 +219,11 @@ impl StorageManager {
             let meta = target.operator.stat(entry.path()).await?;
             if meta.is_file() {
                 let name = entry.name().to_string();
-                let path = entry.path().to_string();
+                let path = entry
+                    .path()
+                    .strip_prefix(&prefix)
+                    .unwrap_or(entry.path())
+                    .to_string();
                 let size = meta.content_length();
                 let modified = meta
                     .last_modified()
@@ -230,7 +257,11 @@ impl StorageManager {
         let full_path = if target.prefix.is_empty() {
             rel_path.to_string()
         } else {
-            format!("{}/{}", target.prefix.trim_end_matches('/'), rel_path.trim_start_matches('/'))
+            format!(
+                "{}/{}",
+                target.prefix.trim_end_matches('/'),
+                rel_path.trim_start_matches('/')
+            )
         };
 
         let bytes = target.operator.read(&full_path).await?;
@@ -244,7 +275,16 @@ impl StorageManager {
             .get(target_id)
             .ok_or_else(|| anyhow!("storage target '{}' not found", target_id))?;
 
-        target.operator.delete(path).await?;
+        let full_path = if target.prefix.is_empty() {
+            path.to_string()
+        } else {
+            format!(
+                "{}/{}",
+                target.prefix.trim_end_matches('/'),
+                path.trim_start_matches('/')
+            )
+        };
+        target.operator.delete(&full_path).await?;
         Ok(())
     }
 }

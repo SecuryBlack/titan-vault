@@ -96,57 +96,123 @@ async fn run(shutdown: tokio::sync::oneshot::Receiver<()>) {
     info!("TitanVault stopped cleanly.");
 }
 
-async fn run_cli_backup(level: &str, config_path: Option<&std::path::Path>) {
-    let cfg = if let Some(p) = config_path {
-        Config::load_from(p).unwrap_or_default()
-    } else {
-        Config::load_default().unwrap_or_default()
-    };
-    println!("📦 TitanVault — Running on-demand backup (level: {})...", level);
-    match BackupPipeline::new(cfg) {
-        Ok(p) => {
-            let reports = p.run_all(level).await;
-            for r in reports {
-                let status = if r.success { "✅ SUCCESS" } else { "❌ FAILED" };
-                println!(
-                    "{} {} ({}) -> {} [{:.2} MB in {:.2}s, -{:.1}%]",
-                    status,
-                    r.source_name,
-                    r.source_type,
-                    r.file_name,
-                    r.final_bytes as f64 / (1024.0 * 1024.0),
-                    r.duration_secs,
-                    r.compression_ratio
-                );
-            }
-        }
-        Err(e) => eprintln!("Error initializing backup pipeline: {e:#}"),
+fn load_cli_config(path: Option<&std::path::Path>) -> anyhow::Result<Config> {
+    match path {
+        Some(p) => Config::load_from(p),
+        None => Config::load_default(),
     }
+    .map_err(|e| anyhow::anyhow!("failed to load backup configuration: {e}"))
 }
 
-async fn run_cli_test(config_path: Option<&std::path::Path>) {
-    let cfg = if let Some(p) = config_path {
-        Config::load_from(p).unwrap_or_default()
-    } else {
-        Config::load_default().unwrap_or_default()
-    };
-    println!("🔍 TitanVault — Testing connectivity to configured storage targets...");
-    match BackupPipeline::new(cfg) {
-        Ok(p) => {
-            let targets = p.storage().get_targets();
-            if targets.is_empty() {
-                println!("⚠️ No storage targets are currently enabled in config.");
-                return;
+async fn run_cli_backup(level: &str, config_path: Option<&std::path::Path>) -> anyhow::Result<()> {
+    if !["hourly", "daily", "weekly", "monthly", "yearly"].contains(&level) {
+        return Err(anyhow::anyhow!("invalid backup level: {level}"));
+    }
+    let p = BackupPipeline::new(load_cli_config(config_path)?)?;
+    let reports = p.run_all(level).await;
+    println!("{}", serde_json::to_string_pretty(&reports)?);
+    if reports.is_empty() || reports.iter().any(|r| !r.success) {
+        return Err(anyhow::anyhow!(
+            "backup failed or no active sources were configured"
+        ));
+    }
+    Ok(())
+}
+
+async fn run_cli_prune(
+    level: Option<&str>,
+    config_path: Option<&std::path::Path>,
+) -> anyhow::Result<()> {
+    let cfg = load_cli_config(config_path)?;
+    let p = BackupPipeline::new(cfg.clone())?;
+    let targets = p.storage().get_targets();
+    if targets.is_empty() {
+        return Err(anyhow::anyhow!("no enabled storage targets"));
+    }
+    for target in targets {
+        let count = if let Some(level) = level {
+            if !["hourly", "daily", "weekly", "monthly", "yearly"].contains(&level) {
+                return Err(anyhow::anyhow!("invalid retention level"));
             }
-            for t in targets {
-                print!("  • Testing target '{}' ({}) ... ", t.id, t.name);
-                match p.storage().test_connection(&t.id).await {
-                    Ok(_) => println!("✅ OK (Connected)"),
-                    Err(e) => println!("❌ FAILED: {:#}", e),
-                }
-            }
+            engine::retention::RetentionManager::prune_target_level(
+                &p.storage(),
+                &target.id,
+                &cfg.retention,
+                level,
+            )
+            .await?
+        } else {
+            engine::retention::RetentionManager::prune_target(
+                &p.storage(),
+                &target.id,
+                &cfg.retention,
+            )
+            .await?
+        };
+        println!("{}: {count} snapshots pruned", target.id);
+    }
+    Ok(())
+}
+
+async fn run_cli_test(config_path: Option<&std::path::Path>) -> anyhow::Result<()> {
+    let p = BackupPipeline::new(load_cli_config(config_path)?)?;
+    let targets = p.storage().get_targets();
+    if targets.is_empty() {
+        return Err(anyhow::anyhow!("no enabled storage targets"));
+    }
+    for target in targets {
+        p.storage().test_connection(&target.id).await?;
+        println!("{}: connected", target.id);
+    }
+    Ok(())
+}
+
+fn required_option<'a>(args: &'a [String], option: &str) -> anyhow::Result<&'a str> {
+    args.iter()
+        .position(|arg| arg == option)
+        .and_then(|i| args.get(i + 1))
+        .filter(|value| !value.starts_with("--"))
+        .map(String::as_str)
+        .ok_or_else(|| anyhow::anyhow!("missing {option} value"))
+}
+
+async fn run_cli_restore(
+    args: &[String],
+    config_path: Option<&std::path::Path>,
+) -> anyhow::Result<()> {
+    let cfg = load_cli_config(config_path)?;
+    let storage = storage::StorageManager::new(&cfg)?;
+    let report = engine::restore::restore_snapshot(
+        &cfg,
+        &storage,
+        required_option(args, "--target")?,
+        required_option(args, "--snapshot")?,
+        std::path::Path::new(required_option(args, "--destination")?),
+    )
+    .await?;
+    println!("{}", serde_json::to_string_pretty(&report)?);
+    Ok(())
+}
+
+async fn run_cli_snapshots(
+    args: &[String],
+    config_path: Option<&std::path::Path>,
+) -> anyhow::Result<()> {
+    let storage = storage::StorageManager::new(&load_cli_config(config_path)?)?;
+    let snapshots = storage
+        .list_snapshots(required_option(args, "--target")?)
+        .await?;
+    println!("{}", serde_json::to_string_pretty(&snapshots)?);
+    Ok(())
+}
+
+fn cli_exit(result: anyhow::Result<()>) -> ! {
+    match result {
+        Ok(()) => std::process::exit(0),
+        Err(e) => {
+            eprintln!("[{BIN_NAME}] {e:#}");
+            std::process::exit(1);
         }
-        Err(e) => eprintln!("Error: {e:#}"),
     }
 }
 
@@ -155,11 +221,16 @@ fn handle_cli_args() {
     sb_agent_core::cli::dispatch_common_args(AGENT_NAME, BIN_NAME, VERSION);
 
     let args: Vec<String> = std::env::args().collect();
-    let config_path = args
-        .iter()
-        .position(|a| a == "--config")
-        .and_then(|idx| args.get(idx + 1))
-        .map(std::path::PathBuf::from);
+    let config_path = if args.iter().any(|a| a == "--config") {
+        Some(std::path::PathBuf::from(
+            required_option(&args, "--config").unwrap_or_else(|e| {
+                eprintln!("{e}");
+                std::process::exit(1)
+            }),
+        ))
+    } else {
+        None
+    };
 
     if args.len() > 1 {
         match args[1].as_str() {
@@ -171,15 +242,37 @@ fn handle_cli_args() {
                 std::process::exit(0);
             }
             "backup" => {
-                let level = args.get(2).map(|s| s.as_str()).unwrap_or("daily");
+                let level = args
+                    .get(2)
+                    .filter(|value| !value.starts_with("--"))
+                    .map(|s| s.as_str())
+                    .unwrap_or("daily");
                 let rt = tokio::runtime::Runtime::new().expect("failed to start tokio runtime");
-                rt.block_on(run_cli_backup(level, config_path.as_deref()));
-                std::process::exit(0);
+                cli_exit(rt.block_on(run_cli_backup(level, config_path.as_deref())));
+            }
+            "restore" => {
+                let rt = tokio::runtime::Runtime::new().expect("failed to start tokio runtime");
+                cli_exit(rt.block_on(run_cli_restore(&args, config_path.as_deref())));
+            }
+            "snapshots" => {
+                let rt = tokio::runtime::Runtime::new().expect("failed to start tokio runtime");
+                cli_exit(rt.block_on(run_cli_snapshots(&args, config_path.as_deref())));
+            }
+            "prune" => {
+                let rt = tokio::runtime::Runtime::new().expect("failed to start tokio runtime");
+                let level = if args.iter().any(|arg| arg == "--level") {
+                    Some(required_option(&args, "--level").unwrap_or_else(|e| {
+                        eprintln!("{e}");
+                        std::process::exit(1)
+                    }))
+                } else {
+                    None
+                };
+                cli_exit(rt.block_on(run_cli_prune(level, config_path.as_deref())));
             }
             "test" => {
                 let rt = tokio::runtime::Runtime::new().expect("failed to start tokio runtime");
-                rt.block_on(run_cli_test(config_path.as_deref()));
-                std::process::exit(0);
+                cli_exit(rt.block_on(run_cli_test(config_path.as_deref())));
             }
             "help" | "--help" | "-h" => {
                 println!(
@@ -189,7 +282,11 @@ fn handle_cli_args() {
                       titanvault [COMMAND]\n\n\
                     COMMANDS:\n\
                       tui, config       Open interactive standalone Terminal User Interface (Ratatui)\n\
-                      backup [LEVEL]    Run on-demand backup (hourly, daily, weekly, monthly)\n\
+                      backup [LEVEL]    Run on-demand backup (hourly, daily, weekly, monthly, yearly)\n\
+                      snapshots --target TARGET   List relative snapshot paths\n\
+                      restore --target TARGET --snapshot PATH --destination NEW_PATH\n\
+                                        Recover files or export SQL, never overwrite a destination\n\
+                      prune             Apply retention to configured targets\n\
                       test              Test connectivity to configured storage targets\n\
                       status            Query status socket and print JSON (from sb-agent-core)\n\
                       top               Monitor agent status live in terminal (from sb-agent-core)\n\

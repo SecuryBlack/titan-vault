@@ -8,3 +8,4 @@ pub use crypto::CryptoEngine;
 pub use pipeline::{BackupPipeline, BackupReport};
 pub use retention::RetentionManager;
 pub use scheduler::AutonomousScheduler;
+pub mod restore;

@@ -1,5 +1,6 @@
 use sb_agent_core::config::{default_config_path, load, ConfigError};
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 pub const AGENT_NAME: &str = "titanvault";
@@ -46,6 +47,8 @@ pub struct CloudConfig {
     pub token: Option<String>,
     #[serde(default)]
     pub heartbeat_url: Option<String>,
+    #[serde(default)]
+    pub heartbeat_urls: BTreeMap<String, String>,
 }
 
 impl Default for CloudConfig {
@@ -54,7 +57,17 @@ impl Default for CloudConfig {
             endpoint: None,
             token: None,
             heartbeat_url: None,
+            heartbeat_urls: BTreeMap::new(),
         }
+    }
+}
+
+impl CloudConfig {
+    pub fn heartbeat_for_level(&self, level: &str) -> Option<&str> {
+        self.heartbeat_urls
+            .get(level)
+            .map(String::as_str)
+            .or(self.heartbeat_url.as_deref())
     }
 }
 
@@ -66,6 +79,42 @@ pub struct ScheduleConfig {
     pub cron: String, // e.g. "0 2 * * *" (daily at 02:00)
     #[serde(default = "default_hourly_cron")]
     pub hourly_cron: String, // e.g. "0 * * * *"
+    #[serde(default = "default_weekly_cron")]
+    pub weekly_cron: String,
+    #[serde(default = "default_monthly_cron")]
+    pub monthly_cron: String,
+    #[serde(default = "default_yearly_cron")]
+    pub yearly_cron: String,
+}
+
+fn default_weekly_cron() -> String {
+    "0 3 * * 0".into()
+}
+fn default_monthly_cron() -> String {
+    "0 4 1 * *".into()
+}
+fn default_yearly_cron() -> String {
+    "0 5 1 1 *".into()
+}
+
+impl ScheduleConfig {
+    pub fn levels(&self) -> [(&str, &str); 5] {
+        [
+            ("hourly", &self.hourly_cron),
+            ("daily", &self.cron),
+            ("weekly", &self.weekly_cron),
+            ("monthly", &self.monthly_cron),
+            ("yearly", &self.yearly_cron),
+        ]
+    }
+
+    pub fn validate(&self) -> anyhow::Result<()> {
+        for (level, expression) in self.levels() {
+            crate::engine::scheduler::CronExpression::parse(expression)
+                .map_err(|e| anyhow::anyhow!("Invalid {level} cron: {e}"))?;
+        }
+        Ok(())
+    }
 }
 
 fn default_true() -> bool {
@@ -86,6 +135,9 @@ impl Default for ScheduleConfig {
             enabled: true,
             cron: default_cron(),
             hourly_cron: default_hourly_cron(),
+            weekly_cron: default_weekly_cron(),
+            monthly_cron: default_monthly_cron(),
+            yearly_cron: default_yearly_cron(),
         }
     }
 }
@@ -307,4 +359,3 @@ mod tests {
         assert_eq!(deserialized.retention.keep_hourly, 24);
     }
 }
-

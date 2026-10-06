@@ -275,7 +275,7 @@ fn render_snapshots_tab(frame: &mut Frame, area: Rect, app: &App) {
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .title(" 📦 Snapshots Catalog — Press [L] to Refresh, [R] to Restore Selected "),
+                .title(" 📦 Snapshots Catalog — [L] Refresh; recover with titanvault restore "),
         );
     frame.render_widget(list, area);
 }

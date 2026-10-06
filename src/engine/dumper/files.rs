@@ -1,5 +1,5 @@
 use crate::config::FilesystemSource;
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use std::path::Path;
 use tar::Builder;
 use tracing::info;
@@ -13,12 +13,18 @@ impl FilesDumper {
     }
 
     fn dump_sync(source: &FilesystemSource) -> Result<Vec<u8>> {
+        if source.paths.is_empty() {
+            return Err(anyhow!("filesystem backup has no source paths"));
+        }
         info!("Starting filesystem archive for '{}'...", source.name);
         let mut builder = Builder::new(Vec::new());
 
         for path in &source.paths {
             if !path.exists() {
-                continue;
+                return Err(anyhow!(
+                    "backup source path does not exist: {}",
+                    path.display()
+                ));
             }
             if path.is_file() {
                 let name = path.file_name().unwrap_or_default();
@@ -27,7 +33,12 @@ impl FilesDumper {
                     .context(format!("failed to append file {:?}", path))?;
             } else if path.is_dir() {
                 let dir_name = path.file_name().unwrap_or_default();
-                Self::append_dir_recursive(&mut builder, path, Path::new(dir_name), &source.excludes)?;
+                Self::append_dir_recursive(
+                    &mut builder,
+                    path,
+                    Path::new(dir_name),
+                    &source.excludes,
+                )?;
             }
         }
 
@@ -68,7 +79,9 @@ impl FilesDumper {
             if entry_path.is_dir() {
                 Self::append_dir_recursive(builder, &entry_path, &sub_arch_path, excludes)?;
             } else if entry_path.is_file() {
-                let _ = builder.append_path_with_name(&entry_path, &sub_arch_path);
+                builder
+                    .append_path_with_name(&entry_path, &sub_arch_path)
+                    .context("failed to append source file to archive")?;
             }
         }
 

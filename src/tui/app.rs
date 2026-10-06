@@ -22,7 +22,7 @@ impl Tab {
             Tab::Sources => "1. Sources (DB & Files)",
             Tab::Targets => "2. Targets (R2/Hetzner/S3)",
             Tab::PolicyCrypto => "3. Policy & Crypto",
-            Tab::Snapshots => "4. Snapshots & Restore",
+            Tab::Snapshots => "4. Snapshots",
         }
     }
 }
