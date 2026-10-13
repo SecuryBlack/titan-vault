@@ -17,10 +17,7 @@ pub fn build_command_registry(state: Arc<SharedVaultState>) -> CommandRegistry {
             let st = st.clone();
             async move {
                 let cfg = st.config.read().await;
-                match serde_json::to_string_pretty(&*cfg) {
-                    Ok(json) => CommandOutcome::ok(json),
-                    Err(e) => CommandOutcome::failed(format!("Failed to serialize config: {e}")),
-                }
+                CommandOutcome::ok(config_json(&cfg))
             }
         });
     }
@@ -31,50 +28,14 @@ pub fn build_command_registry(state: Arc<SharedVaultState>) -> CommandRegistry {
         registry.register("update_config", move |payload, _progress_tx| {
             let st = st.clone();
             async move {
-                let mut current_cfg = st.config.read().await.clone();
-
-                // Permitir actualización completa o por secciones
-                if let Some(sources) = payload.get("sources") {
-                    if let Ok(s) = serde_json::from_value(sources.clone()) {
-                        current_cfg.sources = s;
-                    }
-                }
-                if let Some(targets) = payload.get("targets") {
-                    if let Ok(t) = serde_json::from_value(targets.clone()) {
-                        current_cfg.targets = t;
-                    }
-                }
-                if let Some(sched) = payload.get("schedule") {
-                    if let Ok(s) = serde_json::from_value(sched.clone()) {
-                        current_cfg.schedule = s;
-                    }
-                }
-                if let Some(ret) = payload.get("retention") {
-                    if let Ok(r) = serde_json::from_value(ret.clone()) {
-                        current_cfg.retention = r;
-                    }
-                }
-                if let Some(crypto) = payload.get("crypto") {
-                    if let Ok(c) = serde_json::from_value(crypto.clone()) {
-                        current_cfg.crypto = c;
-                    }
-                }
-
-                // Si se proporcionó el objeto Config completo
-                if payload.get("sources").is_none()
-                    && payload.get("targets").is_none()
-                    && payload.get("schedule").is_none()
-                {
-                    if let Ok(c) = serde_json::from_value::<Config>(payload.clone()) {
-                        current_cfg = c;
-                    }
-                }
+                let current_cfg =
+                    match merge_config_update(st.config.read().await.clone(), &payload) {
+                        Ok(cfg) => cfg,
+                        Err(e) => return CommandOutcome::failed(e),
+                    };
 
                 match st.apply_new_config(current_cfg.clone()).await {
-                    Ok(_) => {
-                        let json = serde_json::to_string_pretty(&current_cfg).unwrap_or_default();
-                        CommandOutcome::ok(json)
-                    }
+                    Ok(_) => CommandOutcome::ok(config_json(&current_cfg)),
                     Err(e) => CommandOutcome::failed(format!("Failed to apply configuration: {e}")),
                 }
             }
@@ -154,10 +115,7 @@ pub fn build_command_registry(state: Arc<SharedVaultState>) -> CommandRegistry {
                 }
 
                 match st.apply_new_config(current_cfg.clone()).await {
-                    Ok(_) => {
-                        let json = serde_json::to_string_pretty(&current_cfg).unwrap_or_default();
-                        CommandOutcome::ok(json)
-                    }
+                    Ok(_) => CommandOutcome::ok(config_json(&current_cfg)),
                     Err(e) => CommandOutcome::failed(format!("Failed to save new source: {e}")),
                 }
             }
@@ -172,7 +130,9 @@ pub fn build_command_registry(state: Arc<SharedVaultState>) -> CommandRegistry {
             async move {
                 let name = match payload.get("name").and_then(|v| v.as_str()) {
                     Some(n) if !n.is_empty() => n,
-                    _ => return CommandOutcome::failed("Missing required field 'name'".to_string()),
+                    _ => {
+                        return CommandOutcome::failed("Missing required field 'name'".to_string())
+                    }
                 };
 
                 let source_type = payload
@@ -211,10 +171,7 @@ pub fn build_command_registry(state: Arc<SharedVaultState>) -> CommandRegistry {
                 }
 
                 match st.apply_new_config(current_cfg.clone()).await {
-                    Ok(_) => {
-                        let json = serde_json::to_string_pretty(&current_cfg).unwrap_or_default();
-                        CommandOutcome::ok(json)
-                    }
+                    Ok(_) => CommandOutcome::ok(config_json(&current_cfg)),
                     Err(e) => CommandOutcome::failed(format!("Failed to delete source: {e}")),
                 }
             }
@@ -238,7 +195,9 @@ pub fn build_command_registry(state: Arc<SharedVaultState>) -> CommandRegistry {
                     .filter(|s| !s.is_empty());
 
                 let desc = match source_name {
-                    Some(s) => format!("Initiating manual backup for source '{s}' (level: {level})..."),
+                    Some(s) => {
+                        format!("Initiating manual backup for source '{s}' (level: {level})...")
+                    }
                     None => format!("Initiating full manual backup (level: {level})..."),
                 };
 
@@ -422,7 +381,103 @@ pub fn build_command_registry(state: Arc<SharedVaultState>) -> CommandRegistry {
     registry
 }
 
+/// Config as returned by the config commands, plus the host's IANA timezone:
+/// schedules run in host local time, and SecuryBlack needs it to evaluate the
+/// heartbeat crons that mirror them.
+fn config_json(cfg: &Config) -> String {
+    let mut value = serde_json::to_value(cfg).unwrap_or_default();
+    if let Some(obj) = value.as_object_mut() {
+        let tz = iana_time_zone::get_timezone().unwrap_or_else(|_| "UTC".to_string());
+        obj.insert("host_timezone".to_string(), serde_json::Value::String(tz));
+    }
+    serde_json::to_string_pretty(&value).unwrap_or_default()
+}
+
+/// Applies the sections present in an `update_config` payload. Sections that
+/// are absent keep their current value; an invalid section rejects the update.
+/// `cloud` only accepts `heartbeat_urls` (level → URL), so the SecuryBlack
+/// token and endpoint can't be changed remotely.
+fn merge_config_update(mut cfg: Config, payload: &serde_json::Value) -> Result<Config, String> {
+    fn section<T: serde::de::DeserializeOwned>(
+        payload: &serde_json::Value,
+        key: &str,
+    ) -> Result<Option<T>, String> {
+        payload
+            .get(key)
+            .map(|v| serde_json::from_value(v.clone()).map_err(|e| format!("Invalid '{key}': {e}")))
+            .transpose()
+    }
+    if let Some(s) = section(payload, "sources")? {
+        cfg.sources = s;
+    }
+    if let Some(t) = section(payload, "targets")? {
+        cfg.targets = t;
+    }
+    if let Some(s) = section(payload, "schedule")? {
+        cfg.schedule = s;
+    }
+    if let Some(r) = section(payload, "retention")? {
+        cfg.retention = r;
+    }
+    if let Some(c) = section(payload, "crypto")? {
+        cfg.crypto = c;
+    }
+    if let Some(cloud) = payload.get("cloud") {
+        if let Some(urls) = section(cloud, "heartbeat_urls")? {
+            cfg.cloud.heartbeat_urls = urls;
+        }
+    }
+    Ok(cfg)
+}
+
 pub fn start_command_intake_server(agent_name: &str, registry: CommandRegistry) {
     let sock_path = default_socket_path(agent_name);
     spawn_server(registry, sock_path);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn base() -> Config {
+        toml::from_str(
+            "[cloud]\ntoken = 'secret'\n[[sources.filesystems]]\nname = 'etc'\npaths = ['/etc']\n[targets.local]\npath = '/var/backups'",
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn partial_update_keeps_other_sections() {
+        let cfg = merge_config_update(base(), &json!({"retention": {"keep_hourly": 5}})).unwrap();
+        assert_eq!(cfg.retention.keep_hourly, 5);
+        assert_eq!(cfg.sources.filesystems.len(), 1);
+        assert!(cfg.targets.local.is_some());
+    }
+
+    #[test]
+    fn cloud_update_only_touches_heartbeat_urls() {
+        let payload =
+            json!({"cloud": {"token": "evil", "heartbeat_urls": {"daily": "https://x.test/d"}}});
+        let cfg = merge_config_update(base(), &payload).unwrap();
+        assert_eq!(
+            cfg.cloud.heartbeat_for_level("daily"),
+            Some("https://x.test/d")
+        );
+        assert_eq!(cfg.cloud.token.as_deref(), Some("secret"));
+        assert_eq!(cfg.sources.filesystems.len(), 1);
+    }
+
+    #[test]
+    fn invalid_section_is_rejected() {
+        assert!(
+            merge_config_update(base(), &json!({"cloud": {"heartbeat_urls": ["no"]}})).is_err()
+        );
+    }
+
+    #[test]
+    fn config_json_reports_host_timezone() {
+        let v: serde_json::Value = serde_json::from_str(&config_json(&base())).unwrap();
+        assert!(v["host_timezone"].as_str().is_some_and(|tz| !tz.is_empty()));
+    }
 }
