@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-13
+
+### Added
+- `update_config` accepts `cloud.heartbeat_urls`, so SecuryBlack can wire its heartbeats to each backup level.
+- Config responses include `host_timezone` (the zone the schedule crons run in).
+
+### Fixed
+- `update_config` merges partial payloads by section. A payload with only retention, crypto or cloud no longer resets sources and targets to defaults.
+
 ## [0.2.0] - 2026-10-06
 
 ### Added
