@@ -60,7 +60,11 @@ async fn run(shutdown: tokio::sync::oneshot::Receiver<()>) {
 
     // 4. Command Intake Socket (para recibir órdenes de nexus-agent / SecuryBlack Cloud)
     let command_registry = commands::build_command_registry(shared_state.clone());
-    commands::start_command_intake_server(AGENT_NAME, command_registry);
+    commands::start_command_intake_server(
+        AGENT_NAME,
+        command_registry,
+        cfg.cloud.token.clone().unwrap_or_default(),
+    );
 
     status_handle.set_state("running");
     status_handle.set_details(serde_json::json!({

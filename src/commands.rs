@@ -3,7 +3,7 @@ use crate::engine::retention::RetentionManager;
 use crate::state::SharedVaultState;
 use sb_agent_core::command_intake::{
     default_socket_path, spawn_server, CommandOutcome, CommandProgress, CommandRegistry,
-    ProgressSender,
+    ProgressSender, SigningContext,
 };
 use std::sync::Arc;
 
@@ -430,9 +430,22 @@ fn merge_config_update(mut cfg: Config, payload: &serde_json::Value) -> Result<C
     Ok(cfg)
 }
 
-pub fn start_command_intake_server(agent_name: &str, registry: CommandRegistry) {
+/// `server_token`: `cloud.token` del config.toml, con el que la API ata las
+/// órdenes firmadas (S4) a este servidor.
+pub fn start_command_intake_server(
+    agent_name: &str,
+    registry: CommandRegistry,
+    server_token: String,
+) {
     let sock_path = default_socket_path(agent_name);
-    spawn_server(registry, sock_path);
+    spawn_server(
+        registry,
+        sock_path,
+        SigningContext {
+            server_token,
+            target_agent: "titanvault".into(),
+        },
+    );
 }
 
 #[cfg(test)]
