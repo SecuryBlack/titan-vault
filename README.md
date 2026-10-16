@@ -176,7 +176,3 @@ All agents can be centrally managed with unified observability by connecting the
 ## License
 
 TitanVault is licensed under the [Apache License, Version 2.0](LICENSE).
-
-## Maintainer context (workspace)
-
-English is the primary language for this repository's public documentation. Shared product decisions, commercial terms and the backlog live in the [workspace wiki](../sb-wiki/Índice.md), [current state](../sb-wiki/Producto/Estado%20actual.md) and [product log](../sb-wiki/Producto/Bitácora.md). These links require `sb-wiki` as a sibling checkout. Keep agent-specific usage and technical contracts here; update shared decisions in the wiki.
