@@ -43,9 +43,6 @@ pub struct App {
     pub live_backup_in_progress: bool,
     pub live_backup_log: Vec<String>,
     pub snapshots: Vec<SnapshotMeta>,
-    pub is_editing: bool,
-    pub edit_buffer: String,
-    pub should_quit: bool,
     pub pipeline: Option<Arc<BackupPipeline>>,
 }
 
@@ -64,9 +61,6 @@ impl App {
             live_backup_in_progress: false,
             live_backup_log: Vec::new(),
             snapshots: Vec::new(),
-            is_editing: false,
-            edit_buffer: String::new(),
-            should_quit: false,
             pipeline,
         }
     }

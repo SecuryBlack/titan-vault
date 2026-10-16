@@ -41,7 +41,7 @@ fn default_mode() -> String {
     "standalone".to_string()
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct CloudConfig {
     pub endpoint: Option<String>,
     pub token: Option<String>,
@@ -49,17 +49,6 @@ pub struct CloudConfig {
     pub heartbeat_url: Option<String>,
     #[serde(default)]
     pub heartbeat_urls: BTreeMap<String, String>,
-}
-
-impl Default for CloudConfig {
-    fn default() -> Self {
-        Self {
-            endpoint: None,
-            token: None,
-            heartbeat_url: None,
-            heartbeat_urls: BTreeMap::new(),
-        }
-    }
 }
 
 impl CloudConfig {
@@ -334,11 +323,6 @@ impl Config {
         let toml_str = toml::to_string_pretty(self)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
         std::fs::write(p, toml_str)
-    }
-
-    pub fn save_default(&self) -> std::io::Result<()> {
-        let path = default_config_path(AGENT_NAME);
-        self.save_to(path)
     }
 }
 

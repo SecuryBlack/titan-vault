@@ -99,10 +99,6 @@ impl BackupPipeline {
         self.storage.clone()
     }
 
-    pub fn config(&self) -> &Config {
-        &self.config
-    }
-
     /// Ejecuta el pipeline para un único origen específico por su nombre
     pub async fn run_source(&self, source_name: &str, level: &str) -> Vec<BackupReport> {
         let _guard = self.execution_lock.lock().await;

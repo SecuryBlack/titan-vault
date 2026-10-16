@@ -281,7 +281,7 @@ pub fn build_command_registry(state: Arc<SharedVaultState>) -> CommandRegistry {
                         all_snapshots.extend(snapshots);
                     }
                 }
-                all_snapshots.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+                all_snapshots.sort_by_key(|s| std::cmp::Reverse(s.created_at));
                 let json = serde_json::to_string_pretty(&all_snapshots).unwrap_or_default();
                 CommandOutcome::ok(json)
             }
