@@ -11,7 +11,7 @@ name = "titanvault"
 path = "src/main.rs"
 
 [dependencies]
-sb-agent-core = { git = "https://github.com/securyblack/sb-agent-core", branch = "main" }
+sb-agent-core = { git = "https://github.com/securyblack/sb-agent-core", tag = "v0.4.0" }
 tokio = { version = "1", features = ["full"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
