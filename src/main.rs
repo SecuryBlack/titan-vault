@@ -63,7 +63,7 @@ async fn run(shutdown: tokio::sync::oneshot::Receiver<()>) {
     commands::start_command_intake_server(
         AGENT_NAME,
         command_registry,
-        cfg.cloud.token.clone().unwrap_or_default(),
+        server_token(cfg.cloud.token.clone()),
     );
 
     status_handle.set_state("running");
@@ -324,4 +324,24 @@ fn main() {
 fn main() {
     handle_cli_args();
     sb_agent_core::service::run_console(run);
+}
+
+/// Token del servidor para verificar órdenes firmadas (S4): `cloud.token` o,
+/// si no hay, el de Nexus, que siempre es el del servidor. Sin él, cuando la
+/// firma sea obligatoria, todas las órdenes firmadas se rechazarían.
+fn server_token(cloud_token: Option<String>) -> String {
+    if let Some(t) = cloud_token.filter(|t| !t.is_empty()) {
+        return t;
+    }
+    let path = if cfg!(windows) {
+        let pd = std::env::var("ProgramData").unwrap_or_else(|_| r"C:\ProgramData".into());
+        std::path::PathBuf::from(pd).join("SecuryBlack").join("agent.toml")
+    } else {
+        std::path::PathBuf::from("/etc/securyblack/agent.toml")
+    };
+    std::fs::read_to_string(&path)
+        .ok()
+        .and_then(|s| s.parse::<toml::Table>().ok())
+        .and_then(|t| t.get("token")?.as_str().map(String::from))
+        .unwrap_or_default()
 }
