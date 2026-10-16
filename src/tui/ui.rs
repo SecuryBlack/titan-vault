@@ -34,7 +34,9 @@ fn render_header(frame: &mut Frame, area: Rect, app: &App) {
         .map(|t| {
             let is_selected = *t == app.current_tab;
             let style = if is_selected {
-                Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD)
             } else {
                 Style::default().fg(Color::Gray)
             };
@@ -44,14 +46,19 @@ fn render_header(frame: &mut Frame, area: Rect, app: &App) {
 
     let tabs = Tabs::new(tab_titles)
         .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title(Span::styled(
-                    " 🛡️  TitanVault — SecuryBlack Standalone Backup Console ",
-                    Style::default().fg(Color::White).add_modifier(Modifier::BOLD),
-                )),
+            Block::default().borders(Borders::ALL).title(Span::styled(
+                " 🛡️  TitanVault — SecuryBlack Standalone Backup Console ",
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
+            )),
         )
-        .select(Tab::all().iter().position(|t| *t == app.current_tab).unwrap_or(0))
+        .select(
+            Tab::all()
+                .iter()
+                .position(|t| *t == app.current_tab)
+                .unwrap_or(0),
+        )
         .highlight_style(Style::default().fg(Color::Cyan));
 
     frame.render_widget(tabs, area);
@@ -82,14 +89,23 @@ fn render_sources_tab(frame: &mut Frame, area: Rect, app: &App) {
     } else {
         for (i, db) in app.config.sources.databases.iter().enumerate() {
             let is_sel = app.selected_index == i;
-            let status = if db.enabled { "● ACTIVE" } else { "○ DISABLED" };
+            let status = if db.enabled {
+                "● ACTIVE"
+            } else {
+                "○ DISABLED"
+            };
             let style = if is_sel {
-                Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD)
             } else {
                 Style::default().fg(Color::White)
             };
             db_lines.push(Line::from(vec![
-                Span::styled(format!("  [{status}] "), Style::default().fg(if db.enabled { Color::Green } else { Color::Red })),
+                Span::styled(
+                    format!("  [{status}] "),
+                    Style::default().fg(if db.enabled { Color::Green } else { Color::Red }),
+                ),
                 Span::styled(format!("{} ({})", db.name, db.driver), style),
             ]));
             db_lines.push(Line::from(format!(
@@ -102,7 +118,11 @@ fn render_sources_tab(frame: &mut Frame, area: Rect, app: &App) {
     }
 
     let dbs_block = Paragraph::new(db_lines)
-        .block(Block::default().borders(Borders::ALL).title(" 🗄️ Database Sources "))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(" 🗄️ Database Sources "),
+        )
         .wrap(Wrap { trim: true });
     frame.render_widget(dbs_block, chunks[0]);
 
@@ -115,23 +135,42 @@ fn render_sources_tab(frame: &mut Frame, area: Rect, app: &App) {
         )));
     } else {
         for fs in &app.config.sources.filesystems {
-            let status = if fs.enabled { "● ACTIVE" } else { "○ DISABLED" };
+            let status = if fs.enabled {
+                "● ACTIVE"
+            } else {
+                "○ DISABLED"
+            };
             fs_lines.push(Line::from(vec![
-                Span::styled(format!("  [{status}] "), Style::default().fg(if fs.enabled { Color::Green } else { Color::Red })),
-                Span::styled(&fs.name, Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    format!("  [{status}] "),
+                    Style::default().fg(if fs.enabled { Color::Green } else { Color::Red }),
+                ),
+                Span::styled(
+                    &fs.name,
+                    Style::default()
+                        .fg(Color::White)
+                        .add_modifier(Modifier::BOLD),
+                ),
             ]));
             for p in &fs.paths {
                 fs_lines.push(Line::from(format!("      Path: {}", p.display())));
             }
             if !fs.excludes.is_empty() {
-                fs_lines.push(Line::from(format!("      Excludes: {}", fs.excludes.join(", "))));
+                fs_lines.push(Line::from(format!(
+                    "      Excludes: {}",
+                    fs.excludes.join(", ")
+                )));
             }
             fs_lines.push(Line::raw(""));
         }
     }
 
     let fs_block = Paragraph::new(fs_lines)
-        .block(Block::default().borders(Borders::ALL).title(" 📁 Filesystem Sources "))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(" 📁 Filesystem Sources "),
+        )
         .wrap(Wrap { trim: true });
     frame.render_widget(fs_block, chunks[1]);
 }
@@ -152,7 +191,10 @@ fn render_targets_tab(frame: &mut Frame, area: Rect, app: &App) {
         None => "[○ NOT CONFIGURED] Hetzner S3".to_string(),
     };
     lines.push(Line::from(vec![
-        Span::styled("1. Hetzner Object Storage: ", Style::default().add_modifier(Modifier::BOLD)),
+        Span::styled(
+            "1. Hetzner Object Storage: ",
+            Style::default().add_modifier(Modifier::BOLD),
+        ),
         Span::styled(hetzner_status, Style::default().fg(Color::Green)),
     ]));
 
@@ -163,7 +205,10 @@ fn render_targets_tab(frame: &mut Frame, area: Rect, app: &App) {
         None => "[○ NOT CONFIGURED] Cloudflare R2 (S3 API)".to_string(),
     };
     lines.push(Line::from(vec![
-        Span::styled("2. Cloudflare R2: ", Style::default().add_modifier(Modifier::BOLD)),
+        Span::styled(
+            "2. Cloudflare R2: ",
+            Style::default().add_modifier(Modifier::BOLD),
+        ),
         Span::styled(r2_status, Style::default().fg(Color::Green)),
     ]));
 
@@ -174,7 +219,10 @@ fn render_targets_tab(frame: &mut Frame, area: Rect, app: &App) {
         None => "[○ NOT CONFIGURED] Local storage path".to_string(),
     };
     lines.push(Line::from(vec![
-        Span::styled("3. Local Storage / NAS: ", Style::default().add_modifier(Modifier::BOLD)),
+        Span::styled(
+            "3. Local Storage / NAS: ",
+            Style::default().add_modifier(Modifier::BOLD),
+        ),
         Span::styled(local_status, Style::default().fg(Color::Green)),
     ]));
 
@@ -186,11 +234,18 @@ fn render_targets_tab(frame: &mut Frame, area: Rect, app: &App) {
 
     if let Some(res) = &app.test_result {
         lines.push(Line::raw(""));
-        lines.push(Line::from(Span::styled(format!("Connectivity Test Result: {res}"), Style::default().fg(Color::LightGreen))));
+        lines.push(Line::from(Span::styled(
+            format!("Connectivity Test Result: {res}"),
+            Style::default().fg(Color::LightGreen),
+        )));
     }
 
     let targets_widget = Paragraph::new(lines)
-        .block(Block::default().borders(Borders::ALL).title(" ☁️ Storage Targets "))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(" ☁️ Storage Targets "),
+        )
         .wrap(Wrap { trim: true });
     frame.render_widget(targets_widget, area);
 }
@@ -205,7 +260,10 @@ fn render_policy_crypto_tab(frame: &mut Frame, area: Rect, app: &App) {
     let ret = &app.config.retention;
     let sched = &app.config.schedule;
     let policy_lines = vec![
-        Line::from(Span::styled("Grandfather-Father-Son (GFS) Retention Rules:", Style::default().fg(Color::Cyan))),
+        Line::from(Span::styled(
+            "Grandfather-Father-Son (GFS) Retention Rules:",
+            Style::default().fg(Color::Cyan),
+        )),
         Line::raw(""),
         Line::from(format!("  • Hourly copies to keep:  {}", ret.keep_hourly)),
         Line::from(format!("  • Daily copies to keep:   {}", ret.keep_daily)),
@@ -213,24 +271,53 @@ fn render_policy_crypto_tab(frame: &mut Frame, area: Rect, app: &App) {
         Line::from(format!("  • Monthly copies to keep: {}", ret.keep_monthly)),
         Line::from(format!("  • Yearly copies to keep:  {}", ret.keep_yearly)),
         Line::raw(""),
-        Line::from(Span::styled("Scheduler Configuration:", Style::default().fg(Color::Cyan))),
-        Line::from(format!("  • Autonomous Scheduler: {}", if sched.enabled { "ENABLED" } else { "DISABLED" })),
+        Line::from(Span::styled(
+            "Scheduler Configuration:",
+            Style::default().fg(Color::Cyan),
+        )),
+        Line::from(format!(
+            "  • Autonomous Scheduler: {}",
+            if sched.enabled { "ENABLED" } else { "DISABLED" }
+        )),
         Line::from(format!("  • Daily Schedule Cron:  {}", sched.cron)),
     ];
 
     let policy_block = Paragraph::new(policy_lines)
-        .block(Block::default().borders(Borders::ALL).title(" ⏰ Retention & Schedule "))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(" ⏰ Retention & Schedule "),
+        )
         .wrap(Wrap { trim: true });
     frame.render_widget(policy_block, chunks[0]);
 
     // Cifrado Zero-Knowledge
     let crypto = &app.config.crypto;
     let crypto_lines = vec![
-        Line::from(Span::styled("Client-Side Zero-Knowledge Encryption:", Style::default().fg(Color::Cyan))),
+        Line::from(Span::styled(
+            "Client-Side Zero-Knowledge Encryption:",
+            Style::default().fg(Color::Cyan),
+        )),
         Line::raw(""),
-        Line::from(format!("  • Status:    {}", if crypto.enabled { "● ACTIVE (Payloads encrypted before upload)" } else { "○ DISABLED" })),
+        Line::from(format!(
+            "  • Status:    {}",
+            if crypto.enabled {
+                "● ACTIVE (Payloads encrypted before upload)"
+            } else {
+                "○ DISABLED"
+            }
+        )),
         Line::from(format!("  • Algorithm: {}", crypto.algorithm)),
-        Line::from(format!("  • Key Source: {}", if crypto.passphrase.is_some() { "Direct Passphrase" } else if crypto.key_file.is_some() { "Master Key File" } else { "None" })),
+        Line::from(format!(
+            "  • Key Source: {}",
+            if crypto.passphrase.is_some() {
+                "Direct Passphrase"
+            } else if crypto.key_file.is_some() {
+                "Master Key File"
+            } else {
+                "None"
+            }
+        )),
         Line::raw(""),
         Line::from(Span::styled(
             "Note: Encrypted backups use ChaCha20-Poly1305 with random per-snapshot nonces.",
@@ -239,7 +326,11 @@ fn render_policy_crypto_tab(frame: &mut Frame, area: Rect, app: &App) {
     ];
 
     let crypto_block = Paragraph::new(crypto_lines)
-        .block(Block::default().borders(Borders::ALL).title(" 🔒 Zero-Knowledge Security "))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(" 🔒 Zero-Knowledge Security "),
+        )
         .wrap(Wrap { trim: true });
     frame.render_widget(crypto_block, chunks[1]);
 }
@@ -256,7 +347,9 @@ fn render_snapshots_tab(frame: &mut Frame, area: Rect, app: &App) {
         for (i, snap) in app.snapshots.iter().enumerate() {
             let is_sel = app.selected_index == i;
             let style = if is_sel {
-                Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD)
             } else {
                 Style::default().fg(Color::White)
             };
@@ -264,19 +357,24 @@ fn render_snapshots_tab(frame: &mut Frame, area: Rect, app: &App) {
             let size_mb = snap.size_bytes as f64 / (1024.0 * 1024.0);
             let line = Line::from(vec![
                 Span::styled(format!("  {} ", snap.name), style),
-                Span::styled(format!("({:.2} MB) ", size_mb), Style::default().fg(Color::Cyan)),
-                Span::styled(format!("- Created: {}", snap.created_at.format("%Y-%m-%d %H:%M:%S")), Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    format!("({:.2} MB) ", size_mb),
+                    Style::default().fg(Color::Cyan),
+                ),
+                Span::styled(
+                    format!("- Created: {}", snap.created_at.format("%Y-%m-%d %H:%M:%S")),
+                    Style::default().fg(Color::DarkGray),
+                ),
             ]);
             items.push(ListItem::new(line));
         }
     }
 
-    let list = List::new(items)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title(" 📦 Snapshots Catalog — [L] Refresh; recover with titanvault restore "),
-        );
+    let list = List::new(items).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title(" 📦 Snapshots Catalog — [L] Refresh; recover with titanvault restore "),
+    );
     frame.render_widget(list, area);
 }
 
@@ -295,8 +393,11 @@ fn render_footer(frame: &mut Frame, area: Rect, app: &App) {
         )),
     ];
 
-    let footer = Paragraph::new(footer_text)
-        .block(Block::default().borders(Borders::ALL).title(" Status & Shortcuts "));
+    let footer = Paragraph::new(footer_text).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title(" Status & Shortcuts "),
+    );
     frame.render_widget(footer, area);
 }
 
@@ -307,13 +408,18 @@ fn render_live_backup_modal(frame: &mut Frame, area: Rect, app: &App) {
     let mut lines = vec![
         Line::from(Span::styled(
             "⚡ Executing Live Backup Pipeline...",
-            Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
         )),
         Line::raw(""),
     ];
 
     for log in &app.live_backup_log {
-        lines.push(Line::from(Span::styled(log, Style::default().fg(Color::White))));
+        lines.push(Line::from(Span::styled(
+            log,
+            Style::default().fg(Color::White),
+        )));
     }
 
     let popup = Paragraph::new(lines)

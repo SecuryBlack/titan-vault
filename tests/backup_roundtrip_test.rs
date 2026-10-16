@@ -16,13 +16,18 @@ fn test_full_pipeline_roundtrip_integrity() {
     use chacha20poly1305::aead::{Aead, KeyInit};
     let cipher = chacha20poly1305::ChaCha20Poly1305::new(&key);
     let nonce = chacha20poly1305::Nonce::from_slice(b"123456789012"); // 12 bytes
-    let ciphertext = cipher.encrypt(nonce, compressed.as_slice()).expect("encryption failed");
+    let ciphertext = cipher
+        .encrypt(nonce, compressed.as_slice())
+        .expect("encryption failed");
 
     // 3. Decrypt
-    let decrypted_compressed = cipher.decrypt(nonce, ciphertext.as_slice()).expect("decryption failed");
+    let decrypted_compressed = cipher
+        .decrypt(nonce, ciphertext.as_slice())
+        .expect("decryption failed");
     assert_eq!(decrypted_compressed, compressed);
 
     // 4. Decompress with zstd
-    let decompressed = zstd::decode_all(decrypted_compressed.as_slice()).expect("zstd decompression failed");
+    let decompressed =
+        zstd::decode_all(decrypted_compressed.as_slice()).expect("zstd decompression failed");
     assert_eq!(decompressed, original_content);
 }

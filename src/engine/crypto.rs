@@ -43,21 +43,24 @@ impl CryptoEngine {
 
     pub fn decrypt(&self, data: &[u8]) -> Result<Vec<u8>> {
         if data.len() < MAGIC_HEADER.len() + NONCE_SIZE {
-            return Err(anyhow!("data too short to be a valid TitanVault encrypted payload"));
+            return Err(anyhow!(
+                "data too short to be a valid TitanVault encrypted payload"
+            ));
         }
 
         if &data[0..4] != MAGIC_HEADER {
-            return Err(anyhow!("invalid magic header: not a TitanVault encrypted archive"));
+            return Err(anyhow!(
+                "invalid magic header: not a TitanVault encrypted archive"
+            ));
         }
 
         let nonce_bytes = &data[4..4 + NONCE_SIZE];
         let ciphertext = &data[4 + NONCE_SIZE..];
         let nonce = Nonce::from_slice(nonce_bytes);
 
-        let plaintext = self
-            .cipher
-            .decrypt(nonce, ciphertext)
-            .map_err(|e| anyhow!("decryption failed (wrong passphrase or corrupted payload): {e}"))?;
+        let plaintext = self.cipher.decrypt(nonce, ciphertext).map_err(|e| {
+            anyhow!("decryption failed (wrong passphrase or corrupted payload): {e}")
+        })?;
 
         Ok(plaintext)
     }

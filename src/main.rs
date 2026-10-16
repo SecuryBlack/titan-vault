@@ -335,7 +335,9 @@ fn server_token(cloud_token: Option<String>) -> String {
     }
     let path = if cfg!(windows) {
         let pd = std::env::var("ProgramData").unwrap_or_else(|_| r"C:\ProgramData".into());
-        std::path::PathBuf::from(pd).join("SecuryBlack").join("agent.toml")
+        std::path::PathBuf::from(pd)
+            .join("SecuryBlack")
+            .join("agent.toml")
     } else {
         std::path::PathBuf::from("/etc/securyblack/agent.toml")
     };

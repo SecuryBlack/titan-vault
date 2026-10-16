@@ -14,7 +14,12 @@ pub enum Tab {
 
 impl Tab {
     pub fn all() -> &'static [Tab] {
-        &[Tab::Sources, Tab::Targets, Tab::PolicyCrypto, Tab::Snapshots]
+        &[
+            Tab::Sources,
+            Tab::Targets,
+            Tab::PolicyCrypto,
+            Tab::Snapshots,
+        ]
     }
 
     pub fn title(&self) -> &'static str {
@@ -52,7 +57,8 @@ impl App {
             config_path,
             current_tab: Tab::Sources,
             selected_index: 0,
-            status_message: "Press [Tab] to switch views, [S] to save config, [B] to run backup now".to_string(),
+            status_message:
+                "Press [Tab] to switch views, [S] to save config, [B] to run backup now".to_string(),
             status_is_error: false,
             test_result: None,
             live_backup_in_progress: false,
@@ -67,7 +73,10 @@ impl App {
 
     pub fn next_tab(&mut self) {
         let tabs = Tab::all();
-        let current_pos = tabs.iter().position(|t| *t == self.current_tab).unwrap_or(0);
+        let current_pos = tabs
+            .iter()
+            .position(|t| *t == self.current_tab)
+            .unwrap_or(0);
         let next_pos = (current_pos + 1) % tabs.len();
         self.current_tab = tabs[next_pos];
         self.selected_index = 0;
@@ -76,8 +85,15 @@ impl App {
 
     pub fn prev_tab(&mut self) {
         let tabs = Tab::all();
-        let current_pos = tabs.iter().position(|t| *t == self.current_tab).unwrap_or(0);
-        let prev_pos = if current_pos == 0 { tabs.len() - 1 } else { current_pos - 1 };
+        let current_pos = tabs
+            .iter()
+            .position(|t| *t == self.current_tab)
+            .unwrap_or(0);
+        let prev_pos = if current_pos == 0 {
+            tabs.len() - 1
+        } else {
+            current_pos - 1
+        };
         self.current_tab = tabs[prev_pos];
         self.selected_index = 0;
         self.test_result = None;
@@ -98,7 +114,10 @@ impl App {
     pub fn save_config(&mut self) {
         match self.config.save_to(&self.config_path) {
             Ok(_) => {
-                self.status_message = format!("Config saved successfully to {}", self.config_path.display());
+                self.status_message = format!(
+                    "Config saved successfully to {}",
+                    self.config_path.display()
+                );
                 self.status_is_error = false;
                 // Reload pipeline with updated config
                 self.pipeline = BackupPipeline::new(self.config.clone()).ok().map(Arc::new);

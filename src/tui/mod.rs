@@ -1,8 +1,8 @@
 pub mod app;
 pub mod ui;
 
-use app::{App, Tab};
 use crate::config::Config;
+use app::{App, Tab};
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
@@ -15,7 +15,8 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 pub async fn run_tui(config_path: Option<PathBuf>) -> std::io::Result<()> {
-    let resolved_path = config_path.unwrap_or_else(|| sb_agent_core::config::default_config_path(crate::config::AGENT_NAME));
+    let resolved_path = config_path
+        .unwrap_or_else(|| sb_agent_core::config::default_config_path(crate::config::AGENT_NAME));
     let config = Config::load_from(&resolved_path).unwrap_or_default();
 
     enable_raw_mode()?;
@@ -73,13 +74,16 @@ async fn event_loop<B: ratatui::backend::Backend>(
                                 app.status_message = "Testing connection to targets...".to_string();
                                 let targets = storage.get_targets();
                                 if targets.is_empty() {
-                                    app.test_result = Some("No targets active to test.".to_string());
+                                    app.test_result =
+                                        Some("No targets active to test.".to_string());
                                 } else {
                                     let mut results = Vec::new();
                                     for t in targets {
                                         match storage.test_connection(&t.id).await {
                                             Ok(_) => results.push(format!("{}: OK", t.id)),
-                                            Err(e) => results.push(format!("{}: FAIL ({})", t.id, e)),
+                                            Err(e) => {
+                                                results.push(format!("{}: FAIL ({})", t.id, e))
+                                            }
                                         }
                                     }
                                     app.test_result = Some(results.join(" | "));
@@ -93,7 +97,8 @@ async fn event_loop<B: ratatui::backend::Backend>(
                             if let Some(p) = &app.pipeline {
                                 app.live_backup_in_progress = true;
                                 app.live_backup_log.clear();
-                                app.live_backup_log.push("Initiating on-demand backup pipeline...".to_string());
+                                app.live_backup_log
+                                    .push("Initiating on-demand backup pipeline...".to_string());
                                 terminal.draw(|frame| ui::render(frame, app))?;
 
                                 let p = p.clone();
@@ -102,10 +107,15 @@ async fn event_loop<B: ratatui::backend::Backend>(
                                     let status = if r.success { "SUCCESS" } else { "FAILED" };
                                     app.live_backup_log.push(format!(
                                         "[{}] {} ({}) -> {} in {:.2}s",
-                                        status, r.source_name, r.source_type, r.file_name, r.duration_secs
+                                        status,
+                                        r.source_name,
+                                        r.source_type,
+                                        r.file_name,
+                                        r.duration_secs
                                     ));
                                 }
-                                app.live_backup_log.push("Job complete. Press [Esc] to return.".to_string());
+                                app.live_backup_log
+                                    .push("Job complete. Press [Esc] to return.".to_string());
                             }
                         }
                         KeyCode::Char('l') | KeyCode::Char('L') => {
@@ -120,7 +130,8 @@ async fn event_loop<B: ratatui::backend::Backend>(
                                     }
                                 }
                                 app.snapshots = all_snaps;
-                                app.status_message = format!("Loaded {} snapshots.", app.snapshots.len());
+                                app.status_message =
+                                    format!("Loaded {} snapshots.", app.snapshots.len());
                             }
                         }
                         _ => {}

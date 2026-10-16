@@ -9,7 +9,10 @@ pub struct PostgresDumper;
 
 impl PostgresDumper {
     pub async fn dump(source: &DatabaseSource) -> Result<Vec<u8>> {
-        info!("Starting PostgreSQL dump for database '{}'...", source.database);
+        info!(
+            "Starting PostgreSQL dump for database '{}'...",
+            source.database
+        );
 
         let mut cmd = if let Some(container) = &source.container_name {
             let mut c = Command::new("docker");
@@ -46,9 +49,9 @@ impl PostgresDumper {
 
         cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
 
-        let mut child = cmd
-            .spawn()
-            .context("failed to spawn pg_dump command (check that docker or pg_dump is installed)")?;
+        let mut child = cmd.spawn().context(
+            "failed to spawn pg_dump command (check that docker or pg_dump is installed)",
+        )?;
 
         let mut stdout = child
             .stdout
@@ -70,7 +73,11 @@ impl PostgresDumper {
         let status = child.wait().await?;
         if !status.success() {
             let err_msg = String::from_utf8_lossy(&err_data);
-            return Err(anyhow!("pg_dump exited with error ({}): {}", status, err_msg.trim()));
+            return Err(anyhow!(
+                "pg_dump exited with error ({}): {}",
+                status,
+                err_msg.trim()
+            ));
         }
 
         info!(
