@@ -1,0 +1,7 @@
+{
+  "name": "TitanVault Agent",
+  "description": "Agente en Rust para copias de seguridad cifradas a almacenamiento S3-compatible o local",
+  "type": "rust",
+  "role": "agent",
+  "start": "cargo run"
+}
