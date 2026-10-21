@@ -1,6 +1,6 @@
 # TitanVault
 
-Open source Rust agent for backup management and streaming backup workflows. Provider support depends on configuration. A working restore command or automatic restore test has not been verified; do not treat backup creation as proof of recoverability.
+Open source Rust agent for encrypted backups of PostgreSQL and files to S3-compatible storage or a local folder. Restores are done from the CLI to a new destination; there is no automatic restore test yet, so a successful backup is not proof that it restores.
 
 ## Use with SecuryBlack
 
@@ -22,13 +22,15 @@ Follow the agent-specific installation and configuration instructions below. Use
 
 ## 🛡️ Philosophy & Key Features
 
-- **Zero intermediate disk storage:** Unlike traditional scripts that write entire dumps to disk before uploading (risking VPS disk exhaustion), TitanVault streams dumps directly through memory compression and multipart cloud uploads.
-- **Ultra-fast compression:** Uses Zstandard (`zstd`) for an optimal balance between compression ratio and CPU throughput.
-- **Zero-Knowledge client encryption:** Client-side authenticated symmetric encryption (`ChaCha20-Poly1305`) before data leaves the server.
-- **Native Multi-Cloud (Apache OpenDAL):** Unified native drivers for **Cloudflare R2**, **Hetzner Object Storage (S3)**, **AWS S3**, **MinIO**, **Google Drive**, and local storage without host dependencies (no `awscli`, no `rclone`).
-- **Standalone Interactive TUI (Ratatui):** Full-featured terminal console to configure data sources, remote targets, test endpoints with `<T>`, browse snapshots, without a cloud dependency. Restoration is not verified as an implemented command.
-- **Automated GFS Retention:** Smart lifecycle pruning of hourly, daily, weekly, monthly, and yearly backups across remote buckets.
-- **SecuryBlack Cloud Integration:** Automatic registration via `sb-agent-core`, gRPC tunnel via `nexus-agent`, and real-time streaming progress reporting (`CommandProgress`).
+- **No temporary files on disk:** the dump is compressed, encrypted and uploaded from memory. The whole dump is held in RAM, so memory use grows with the size of the database; bounded-memory streaming is on the roadmap.
+- **Compression:** Zstandard (`zstd`).
+- **Client-side encryption:** `ChaCha20-Poly1305` before data leaves the server (optional).
+- **Storage targets (Apache OpenDAL):** Cloudflare R2, Hetzner Object Storage, any S3-compatible service (AWS S3, MinIO…) and a local folder. Google Drive is not supported natively.
+- **Sources:** PostgreSQL (via `pg_dump`, also inside a Docker container) and filesystem paths with excludes.
+- **Schedule and retention:** five cron levels (hourly, daily, weekly, monthly, yearly) in the host's local time, with per-source GFS pruning.
+- **Restore from the CLI:** `titanvault restore` recovers files or exports SQL to a new path and never overwrites an existing destination. It does not import into your live database.
+- **Terminal UI:** configure sources and targets, test them and browse snapshots without the cloud.
+- **SecuryBlack Cloud:** registration via `sb-agent-core`, commands through the `nexus-agent` tunnel, and backup status in the panel.
 
 ---
 
@@ -64,6 +66,10 @@ titanvault test
 
 # Trigger an immediate on-demand backup
 titanvault backup daily
+
+# List snapshots in a target and restore one to a new path
+titanvault snapshots --target cloudflare_r2
+titanvault restore --target cloudflare_r2 --snapshot <PATH> --destination /tmp/restore.sql
 ```
 
 ---
@@ -141,11 +147,12 @@ titan-vault/
 │   ├── storage/             # Multi-cloud drivers (Apache OpenDAL S3/Fs)
 │   │   └── mod.rs           # StorageManager, upload_all, list_snapshots, test_connection
 │   ├── engine/              # Backup pipeline
-│   │   ├── pipeline.rs      # Streaming: Source -> zstd -> ChaCha20 -> Upload
+│   │   ├── pipeline.rs      # Source -> zstd -> ChaCha20 -> upload (in memory)
 │   │   ├── crypto.rs        # Zero-Knowledge encryption (ChaCha20-Poly1305)
 │   │   ├── retention.rs     # GFS lifecycle retention engine (Grandfather-Father-Son)
 │   │   ├── scheduler.rs     # Autonomous Tokio scheduler (local cron)
-│   │   └── dumper/          # Streaming dumpers (PostgreSQL, Filesystem)
+│   │   ├── restore.rs       # CLI restore to a new destination
+│   │   └── dumper/          # Dumpers (PostgreSQL, filesystem)
 │   └── tui/                 # Terminal User Interface (Ratatui + Crossterm)
 │       ├── mod.rs           # Event loop and raw mode handling
 │       ├── app.rs           # State machine and form models
@@ -164,10 +171,10 @@ TitanVault is a specialized storage and disaster recovery agent within the Secur
 | Agent | Core Focus | Official Website | Repository |
 | :--- | :--- | :--- | :--- |
 | **OxiPulse** | Server telemetry and OTLP metrics | [oxipulse.dev](https://oxipulse.dev) | [securyblack/oxi-pulse](https://github.com/securyblack/oxi-pulse) |
-| **FerroSentry** | Lightweight EDR, auditd, brute-force mitigation & firewall | [ferrosentry.dev](https://ferrosentry.dev) | [securyblack/ferro-sentry](https://github.com/securyblack/ferro-sentry) |
+| **FerroSentry** | Security audits, firewall and fail2ban/CrowdSec management | [ferrosentry.dev](https://ferrosentry.dev) | [securyblack/ferro-sentry](https://github.com/securyblack/ferro-sentry) |
 | **CupraFlow** | Networking/HA development (not operationally verified) | [cupraflow.dev](https://cupraflow.dev) | [securyblack/cupra-flow](https://github.com/securyblack/cupra-flow) |
 | **CromoForge** | Docker containers, logs & PostgreSQL management | [cromoforge.dev](https://cromoforge.dev) | [securyblack/cromo-forge](https://github.com/securyblack/cromo-forge) |
-| **TitanVault** | Streaming backups (restore workflow not verified) | [titanvault.dev](https://titanvault.dev) | [securyblack/titan-vault](https://github.com/securyblack/titan-vault) |
+| **TitanVault** | Encrypted backups to S3-compatible storage, CLI restore | [titanvault.dev](https://titanvault.dev) | [securyblack/titan-vault](https://github.com/securyblack/titan-vault) |
 
 All agents can be centrally managed with unified observability by connecting them to [SecuryBlack Cloud](https://securyblack.com).
 
