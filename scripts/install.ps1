@@ -16,7 +16,7 @@ $DataDir = "$env:ProgramData\titanvault"
 $Repo = "securyblack/titan-vault"
 
 # Descargar librería compartida de sb-agent-core
-$LibUrl = "https://raw.githubusercontent.com/securyblack/sb-agent-core/main/scripts/install-lib.ps1"
+$LibUrl = "https://raw.githubusercontent.com/securyblack/sb-agent-core/master/scripts/install-lib.ps1"
 $LibPath = "$env:TEMP\sb_install_lib.ps1"
 Invoke-WebRequest -Uri $LibUrl -OutFile $LibPath
 . $LibPath
