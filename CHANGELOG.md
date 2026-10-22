@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-10-23
+
+### Added
+- **Commands**: `restore_snapshot` (`target`, `path`) recovers a snapshot from the panel, the same way as `titanvault restore`: into a new path under `/var/lib/titanvault/restores` (`%ProgramData%\SecuryBlack\titanvault\restores` on Windows), named after the snapshot with the time in front. A SQL dump becomes a `.sql` file that is never run; a files snapshot becomes a new folder. Nothing existing is overwritten. Returns the same report as the CLI.
+
 ## [0.2.3] - 2026-10-16
 
 ### Security

@@ -378,7 +378,71 @@ pub fn build_command_registry(state: Arc<SharedVaultState>) -> CommandRegistry {
         });
     }
 
+    // 10. Comando: restore_snapshot — recupera una copia a una ruta nueva del
+    // servidor (restores_dir), igual que `titanvault restore`: nunca sobrescribe
+    // ni ejecuta el SQL recuperado.
+    {
+        let st = state.clone();
+        registry.register("restore_snapshot", move |payload, _progress_tx| {
+            let st = st.clone();
+            async move {
+                let (Some(target), Some(path)) = (
+                    payload.get("target").and_then(|v| v.as_str()),
+                    payload.get("path").and_then(|v| v.as_str()),
+                ) else {
+                    return CommandOutcome::failed("target and path are required");
+                };
+                let dir = restores_dir();
+                if let Err(e) = std::fs::create_dir_all(&dir) {
+                    return CommandOutcome::failed(format!("create {}: {e}", dir.display()));
+                }
+                let destination = dir.join(restore_name(path, chrono::Utc::now()));
+                let cfg = st.config.read().await.clone();
+                let p = st.pipeline.read().await.clone();
+                match crate::engine::restore::restore_snapshot(
+                    &cfg,
+                    &p.storage(),
+                    target,
+                    path,
+                    &destination,
+                )
+                .await
+                {
+                    Ok(report) => {
+                        CommandOutcome::ok(serde_json::to_string(&report).unwrap_or_default())
+                    }
+                    Err(e) => CommandOutcome::failed(format!("Restore failed: {e:#}")),
+                }
+            }
+        });
+    }
+
     registry
+}
+
+fn restores_dir() -> std::path::PathBuf {
+    if cfg!(windows) {
+        let pd = std::env::var("ProgramData").unwrap_or_else(|_| r"C:\ProgramData".into());
+        std::path::PathBuf::from(pd)
+            .join("SecuryBlack")
+            .join("titanvault")
+            .join("restores")
+    } else {
+        std::path::PathBuf::from("/var/lib/titanvault/restores")
+    }
+}
+
+/// `db/app-20261022.sql.zst.enc` → `20261023-010509-app-20261022.sql`; un `.tar.zst`
+/// da una carpeta. La hora delante hace que dos restauraciones no choquen.
+fn restore_name(path: &str, now: chrono::DateTime<chrono::Utc>) -> String {
+    let name = path.rsplit('/').next().unwrap_or(path);
+    let plain = name.strip_suffix(".enc").unwrap_or(name);
+    let base = plain
+        .strip_suffix(".sql.zst")
+        .map(|b| format!("{b}.sql"))
+        .or_else(|| plain.strip_suffix(".tar.zst").map(String::from))
+        .unwrap_or_else(|| plain.to_string());
+    format!("{}-{base}", now.format("%Y%m%d-%H%M%S"))
 }
 
 /// Config as returned by the config commands, plus the host's IANA timezone:
@@ -486,6 +550,22 @@ mod tests {
         assert!(
             merge_config_update(base(), &json!({"cloud": {"heartbeat_urls": ["no"]}})).is_err()
         );
+    }
+
+    #[test]
+    fn restore_names_are_new_paths() {
+        let now = chrono::DateTime::parse_from_rfc3339("2026-10-23T01:05:09Z")
+            .unwrap()
+            .into();
+        assert_eq!(
+            restore_name("db/app-1.sql.zst.enc", now),
+            "20261023-010509-app-1.sql"
+        );
+        assert_eq!(
+            restore_name("fs/www-1.tar.zst", now),
+            "20261023-010509-www-1"
+        );
+        assert_eq!(restore_name("weird.bin", now), "20261023-010509-weird.bin");
     }
 
     #[test]
