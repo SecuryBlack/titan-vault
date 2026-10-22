@@ -4,7 +4,7 @@ fn test_full_pipeline_roundtrip_integrity() {
 
     // 1. Compress with zstd
     let compressed = zstd::encode_all(&original_content[..], 3).expect("zstd compression failed");
-    assert!(compressed.len() > 0);
+    assert!(!compressed.is_empty());
 
     // 2. Encrypt with ChaCha20-Poly1305
     let passphrase = "my-ultra-secure-passphrase";
