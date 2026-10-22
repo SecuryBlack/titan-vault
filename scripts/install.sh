@@ -13,7 +13,7 @@ SERVICE_NAME="titanvault"
 SERVICE_DESC="TitanVault Backup & Disaster Recovery Agent (SecuryBlack)"
 
 # Descargar librería compartida de sb-agent-core
-LIB_URL="https://raw.githubusercontent.com/securyblack/sb-agent-core/main/scripts/install-lib.sh"
+LIB_URL="https://raw.githubusercontent.com/securyblack/sb-agent-core/master/scripts/install-lib.sh"
 LIB_TMP="$(mktemp)"
 curl -fsSL "$LIB_URL" -o "$LIB_TMP"
 # shellcheck source=/dev/null
