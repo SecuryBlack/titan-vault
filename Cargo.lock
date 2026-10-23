@@ -2997,8 +2997,8 @@ dependencies = [
 
 [[package]]
 name = "sb-agent-core"
-version = "0.4.1"
-source = "git+https://github.com/securyblack/sb-agent-core?tag=v0.4.1#45bbc2ab687e6ce1e3d75da71888e6aa49b000ff"
+version = "0.4.2"
+source = "git+https://github.com/securyblack/sb-agent-core?tag=v0.4.2#646b6a4892c519bac6cdbd67dcb07a1f3abd0f3b"
 dependencies = [
  "base64 0.22.1",
  "crossterm 0.28.1",
@@ -3663,7 +3663,7 @@ checksum = "fd3ca314f692efd6c868f8408f53fe444634a845f96c028b97d35f6a1f79f0ee"
 
 [[package]]
 name = "titan-vault"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "anyhow",
  "async-trait",
