@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.2] - 2026-11-14
+
+### Security
+- **Dependencies**: `sb-agent-core` 0.4.3, which moves `self_update` to 1.3 and `zip` to 9.x (GHSA-m665-v7pm-7grj, GHSA-q7v9-x93c-xqv3, GHSA-8hxf-qr8p-62x4), and `rustls` 0.23.46. Releases are still verified with zipsign before installing.
+- **Dependencies**: `ratatui` 0.30 (was 0.29), which drops `lru` 0.12 (GHSA-rhfx-m35p-ff5j).
+
 ## [0.3.1] - 2026-10-23
 
 ### Added
