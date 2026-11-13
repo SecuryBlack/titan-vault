@@ -34,7 +34,7 @@ pub async fn run_tui(config_path: Option<PathBuf>) -> std::io::Result<()> {
     res
 }
 
-async fn event_loop<B: ratatui::backend::Backend>(
+async fn event_loop<B: ratatui::backend::Backend<Error = std::io::Error>>(
     terminal: &mut Terminal<B>,
     app: &mut App,
 ) -> std::io::Result<()> {
